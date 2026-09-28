@@ -31,6 +31,15 @@ export async function startRepl(): Promise<void> {
 
   mkdirSync(DATA_DIR, { recursive: true })
   const storage = new Storage(path.join(DATA_DIR, "db.sqlite"))
+  // 崩溃恢复：标记上次会话中残留的 running 工具调用，列出可恢复会话
+  const interrupted = storage.interruptRunningToolParts()
+  const recent = storage.recentSessions(3)
+  if (recent.length) {
+    printNotice(
+      `${recent.length} session(s) on record (latest: ${new Date(recent[0].time_updated).toLocaleString()})` +
+        (interrupted ? `, ${interrupted} interrupted tool call(s) marked` : ""),
+    )
+  }
   const session = storage.createSession({ directory: process.cwd() })
   const abort = new AbortController()
 

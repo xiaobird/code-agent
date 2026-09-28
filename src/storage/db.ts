@@ -53,4 +53,40 @@ export class Storage {
       ),
     }))
   }
+
+  recentSessions(limit = 5) {
+    return this.db
+      .prepare("SELECT id, directory, time_updated FROM session ORDER BY time_updated DESC LIMIT ?")
+      .all(limit) as { id: string; directory: string; time_updated: number }[]
+  }
+
+  /** 崩溃恢复：把所有残留 running/pending 的 tool part 标记为 interrupted，返回数量 */
+  interruptRunningToolParts(): number {
+    const rows = this.db.prepare("SELECT id, data FROM part").all() as { id: string; data: string }[]
+    const update = this.db.prepare("UPDATE part SET data = ? WHERE id = ?")
+    let n = 0
+    for (const row of rows) {
+      let data: { type?: string; state?: { status?: string; input?: unknown; time?: { start?: number } } }
+      try {
+        data = JSON.parse(row.data)
+      } catch {
+        continue
+      }
+      if (data.type !== "tool") continue
+      if (data.state?.status !== "running" && data.state?.status !== "pending") continue
+      const interrupted = {
+        type: "tool",
+        ...data,
+        state: {
+          status: "error",
+          input: data.state?.input ?? {},
+          error: "interrupted by restart",
+          time: { start: data.state?.time?.start ?? Date.now(), end: Date.now() },
+        },
+      }
+      update.run(JSON.stringify(interrupted), row.id)
+      n++
+    }
+    return n
+  }
 }
