@@ -43,6 +43,17 @@ export async function* streamLLM(input: {
           output: (part.output as { value?: unknown })?.value ?? part.output,
         }
         break
+      case "tool-error":
+        yield {
+          type: "tool-result",
+          id: part.toolCallId,
+          output: {
+            title: part.toolName,
+            output: `Error: ${String(part.error instanceof Error ? part.error.message : part.error)}`,
+            metadata: {},
+          },
+        }
+        break
       case "finish": {
         const u = part.totalUsage
         yield {

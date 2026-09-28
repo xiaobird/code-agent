@@ -20,7 +20,7 @@ export class Storage {
     ).run(session.id, session.parentID, session.title, session.directory, session.time_created, session.time_updated)
     return session
   }
-  updateMessage(msg: { id: string; sessionID: string; time?: { created: number }; [k: string]: unknown }) {
+  updateMessage(msg: { id: string; sessionID: string; time?: { created: number; completed?: number }; [k: string]: unknown }) {
     const { id, sessionID, ...data } = msg
     const created = msg.time?.created ?? Date.now()
     this.db.prepare(

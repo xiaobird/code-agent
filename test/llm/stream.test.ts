@@ -5,7 +5,7 @@ import { streamLLM } from "../../src/llm/stream"
 const messages = [{ role: "user" as const, content: "hi" }]
 
 test("maps text deltas and finish", async () => {
-  const model = scriptedModel([[text("hello"), finish("stop", 1, 1)]])
+  const model = scriptedModel([[...text("hello"), finish("stop", 1, 1)]])
   const events = []
   for await (const e of streamLLM({ model, system: [], messages, tools: {}, abort: new AbortController().signal }))
     events.push(e)
