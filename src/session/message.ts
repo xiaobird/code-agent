@@ -3,7 +3,7 @@ import type { ModelMessage } from "ai"
 export type Message = { id: string; sessionID: string; role: "user" | "assistant"
   finish?: string; summary?: boolean; parentID?: string; agent?: string
   tokens?: { total?: number; input: number; output: number; cache: { read: number; write: number } }
-  time: { created: number; completed?: number }; [k: string]: unknown }
+  time?: { created: number; completed?: number }; [k: string]: unknown }
 export type Part = { id: string; messageID: string; sessionID: string } & (
   | { type: "text"; text: string }
   | { type: "tool"; tool: string; callID: string; state: ToolState }
