@@ -4,6 +4,7 @@ import type { Storage } from "../storage/db"
 import { filterCompacted, hasPendingToolCalls, latest, type MessageWithParts } from "./message"
 import { processTurn, type ProcessInput } from "./processor"
 import { isOverflow } from "../compaction/overflow"
+import { prune } from "../compaction/prune"
 
 export interface RunInput {
   storage: Storage
@@ -48,6 +49,8 @@ export async function runLoop(input: RunInput): Promise<void> {
     storage.updateMessage(assistantMsg)
 
     const result = await processTurn({ ...input, assistantMsg, messages: msgs })
+    // 每轮结束后台清理旧工具输出（失败不影响主流程）
+    void prune(storage, sessionID).catch(() => {})
     if (result === "stop") break
     if (result === "compact") break // Task 20 替换为压缩后续跑
   }
