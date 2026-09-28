@@ -20,6 +20,12 @@ export class Storage {
     ).run(session.id, session.parentID, session.title, session.directory, session.time_created, session.time_updated)
     return session
   }
+  getSession(id: string): { id: string; parentID: string | null; title: string; directory: string } | undefined {
+    const row = this.db
+      .prepare("SELECT id, parent_id, title, directory FROM session WHERE id = ?")
+      .get(id) as { id: string; parent_id: string | null; title: string; directory: string } | undefined
+    return row ? { id: row.id, parentID: row.parent_id, title: row.title, directory: row.directory } : undefined
+  }
   updateMessage(msg: { id: string; sessionID: string; time?: { created: number; completed?: number }; [k: string]: unknown }) {
     const { id, sessionID, ...data } = msg
     const created = msg.time?.created ?? Date.now()

@@ -41,6 +41,9 @@ export async function startRepl(): Promise<void> {
     "Use the available tools to read, search and understand code before answering.",
   ]
 
+  const { registerTaskTool } = await import("../tool/task")
+  registerTaskTool({ storage, model, modelInfo: { contextLimit: CONTEXT_LIMIT }, baseSystem: system })
+
   printBanner()
   const rl = createInterface({ input: process.stdin, output: process.stdout, prompt: "" })
 
