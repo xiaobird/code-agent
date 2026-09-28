@@ -7,7 +7,8 @@ import { createAnthropic } from "@ai-sdk/anthropic"
 import type { LanguageModel } from "ai"
 import { Storage } from "../storage/db"
 import { runLoop } from "../session/run"
-import { printBanner, printPrompt, printAssistantHeader, printToolStart, printToolEnd, printError, printNotice } from "./render"
+import { createAsk, type Rule } from "../permission"
+import { printBanner, printPrompt, printAssistantHeader, printToolStart, printToolEnd, printError, printNotice, printDiff } from "./render"
 
 const DATA_DIR = path.join(homedir(), ".local", "share", "code-agent")
 const CONTEXT_LIMIT = 200_000 // M3 前的临时常量
@@ -49,8 +50,18 @@ export async function startRepl(): Promise<void> {
     printPrompt()
   })
 
-  const ask = async (_req: { permission: string; patterns: string[] }) => {
-    // M1：默认全放行；Task 12 接入真实权限
+  // 默认权限：只读工具放行，写操作与命令执行需确认
+  const defaultRules: Rule[] = [
+    { permission: "read", pattern: "*", action: "allow" },
+    { permission: "grep", pattern: "*", action: "allow" },
+    { permission: "glob", pattern: "*", action: "allow" },
+  ]
+  const rlQuestion = (q: string) =>
+    new Promise<string>((resolve) => rl.question(q, (answer) => resolve(answer.trim().toLowerCase())))
+  const rawAsk = createAsk(defaultRules, rlQuestion)
+  const ask = async (req: { permission: string; patterns: string[]; metadata?: Record<string, unknown> }) => {
+    if (req.metadata?.diff) printDiff(String(req.metadata.diff))
+    await rawAsk(req)
   }
 
   const question = () =>
