@@ -17,12 +17,15 @@ export interface ProcessInput {
   messages: MessageWithParts[]
   ask: (req: { permission: string; patterns: string[]; metadata?: Record<string, unknown> }) => Promise<void>
   onText: (delta: string) => void // CLI 流式渲染回调
+  onToolStart?: (name: string, input: unknown) => void
+  onToolEnd?: (name: string, title: string, ms: number) => void
   abort: AbortSignal
 }
 
 export async function processTurn(input: ProcessInput): Promise<"stop" | "continue" | "compact"> {
   const { storage, sessionID, assistantMsg } = input
   let text = ""
+  const toolStart = new Map<string, number>()
   const tools = toAISDKTools({ sessionID, abort: input.abort, ask: input.ask, metadata: async () => {} })
   const modelMessages = toModelMessages(input.messages)
 
@@ -39,6 +42,8 @@ export async function processTurn(input: ProcessInput): Promise<"stop" | "contin
         input.onText(event.text)
         break
       case "tool-call":
+        toolStart.set(event.id, Date.now())
+        input.onToolStart?.(event.name, event.input)
         storage.updatePart({
           id: randomUUID(),
           messageID: assistantMsg.id,
@@ -54,6 +59,9 @@ export async function processTurn(input: ProcessInput): Promise<"stop" | "contin
         const part = msgs.flatMap((m) => m.parts).find((p) => p.type === "tool" && p.callID === event.id)
         if (part?.type === "tool") {
           const output = event.output as { output?: string; title?: string; metadata?: Record<string, unknown> }
+          const ms = Date.now() - (toolStart.get(event.id) ?? Date.now())
+          input.onToolEnd?.(part.tool, output?.title ?? part.tool, ms)
+          toolStart.delete(event.id)
           storage.updatePart({
             ...part,
             state: {

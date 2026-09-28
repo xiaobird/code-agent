@@ -13,6 +13,8 @@ export interface RunInput {
   system: string[]
   ask: ProcessInput["ask"]
   onText: (d: string) => void
+  onToolStart?: ProcessInput["onToolStart"]
+  onToolEnd?: ProcessInput["onToolEnd"]
   abort: AbortSignal
 }
 
