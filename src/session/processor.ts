@@ -6,6 +6,7 @@ import { toModelMessages } from "./message"
 import { toAISDKTools } from "../tool/registry"
 import { streamLLM } from "../llm/stream"
 import { isOverflow } from "../compaction/overflow"
+import { checkDoomLoop } from "./doom"
 
 export interface ProcessInput {
   storage: Storage
@@ -41,7 +42,24 @@ export async function processTurn(input: ProcessInput): Promise<"stop" | "contin
         text += event.text
         input.onText(event.text)
         break
-      case "tool-call":
+      case "tool-call": {
+        // doom loop 检测：连续第三次完全相同的调用 → 询问，拒绝则终止本轮
+        if (checkDoomLoop(storage, sessionID, event.name, event.input)) {
+          try {
+            await input.ask({
+              permission: "doom_loop",
+              patterns: [`${event.name} ${JSON.stringify(event.input ?? {})}`],
+            })
+          } catch (denied) {
+            storage.updateMessage({
+              ...assistantMsg,
+              error: `Doom loop interrupted: ${denied instanceof Error ? denied.message : String(denied)}`,
+              finish: "error",
+              time: { created: assistantMsg.time?.created ?? Date.now(), completed: Date.now() },
+            })
+            return "stop"
+          }
+        }
         toolStart.set(event.id, Date.now())
         input.onToolStart?.(event.name, event.input)
         storage.updatePart({
@@ -54,6 +72,7 @@ export async function processTurn(input: ProcessInput): Promise<"stop" | "contin
           state: { status: "running", input: (event.input as Record<string, unknown>) ?? {}, time: { start: Date.now() } },
         })
         break
+      }
       case "tool-result": {
         const msgs = storage.messagesWithParts(sessionID)
         const part = msgs.flatMap((m) => m.parts).find((p) => p.type === "tool" && p.callID === event.id)
