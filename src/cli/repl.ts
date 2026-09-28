@@ -77,8 +77,27 @@ export async function startRepl(): Promise<void> {
     const line = await question()
     if (!line) continue
     if (line === "/exit") break
-    if (line === "/revert" || line === "/compact") {
-      printNotice(`${line}: not implemented`)
+    if (line === "/revert") {
+      const msgs = storage.messagesWithParts(session.id)
+      let target: { fromHash?: string; hash: string } | undefined
+      for (let i = msgs.length - 1; i >= 0; i--) {
+        const p = msgs[i].parts.find((x) => x.type === "patch")
+        if (p && p.type === "patch") {
+          target = p
+          break
+        }
+      }
+      if (!target?.fromHash) printNotice("no snapshot to revert to")
+      else {
+        const { initSnapshot, revertTo } = await import("../snapshot/index")
+        initSnapshot(process.cwd())
+        await revertTo(target.fromHash).catch((e: unknown) => printError(String(e)))
+        printNotice(`reverted to snapshot ${target.fromHash.slice(0, 12)}`)
+      }
+      continue
+    }
+    if (line === "/compact") {
+      printNotice("/compact: not implemented")
       continue
     }
 
@@ -105,6 +124,7 @@ export async function startRepl(): Promise<void> {
         model,
         modelInfo: { contextLimit: CONTEXT_LIMIT },
         system,
+        worktree: process.cwd(),
         ask,
         onText: (d) => process.stdout.write(d),
         onToolStart: printToolStart,

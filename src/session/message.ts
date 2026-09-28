@@ -8,7 +8,7 @@ export type Part = { id: string; messageID: string; sessionID: string } & (
   | { type: "text"; text: string }
   | { type: "tool"; tool: string; callID: string; state: ToolState }
   | { type: "compaction"; auto: boolean; tail_start_id?: string }
-  | { type: "patch"; hash: string; files: string[] }
+  | { type: "patch"; hash: string; fromHash?: string; files: string[] }
 )
 export type ToolState =
   | { status: "pending" | "running"; input: Record<string, unknown>; time?: { start: number } }
