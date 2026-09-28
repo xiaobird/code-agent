@@ -5,6 +5,7 @@ import { filterCompacted, hasPendingToolCalls, latest, type MessageWithParts } f
 import { processTurn, type ProcessInput } from "./processor"
 import { isOverflow } from "../compaction/overflow"
 import { prune } from "../compaction/prune"
+import { compact } from "../compaction/index"
 
 export interface RunInput {
   storage: Storage
@@ -36,8 +37,12 @@ export async function runLoop(input: RunInput): Promise<void> {
     )
       break
 
-    // 溢出预防：上轮 token 超限 → 本任务先 break（Task 20 接入压缩）
-    if (lastAssistant?.tokens && isOverflow(lastAssistant.tokens as never, input.modelInfo.contextLimit)) break
+    // 溢出预防：上轮 token 超限 → 先压缩再继续
+    if (lastAssistant?.tokens && isOverflow(lastAssistant.tokens as never, input.modelInfo.contextLimit)) {
+      const r = await compact(storage, sessionID, input.model, input.modelInfo)
+      if (r === "stop") break
+      continue
+    }
 
     const assistantMsg = {
       id: randomUUID(),
@@ -52,6 +57,10 @@ export async function runLoop(input: RunInput): Promise<void> {
     // 每轮结束后台清理旧工具输出（失败不影响主流程）
     void prune(storage, sessionID).catch(() => {})
     if (result === "stop") break
-    if (result === "compact") break // Task 20 替换为压缩后续跑
+    if (result === "compact") {
+      const r = await compact(storage, sessionID, input.model, input.modelInfo)
+      if (r === "stop") break
+      continue
+    }
   }
 }
