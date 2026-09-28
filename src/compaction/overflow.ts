@@ -1,4 +1,8 @@
 import type { TokenUsage } from "../llm/stream"
 
-// Task 17 替换为完整版（含预留 buffer）
-export const isOverflow = (t: TokenUsage, limit: number) => t.total >= limit
+export const DEFAULT_RESERVED_BUFFER = Math.min(20000, 8192)
+
+export function isOverflow(tokens: TokenUsage, contextLimit: number, reserved?: number): boolean {
+  const buffer = reserved ?? DEFAULT_RESERVED_BUFFER
+  return tokens.total >= contextLimit - buffer
+}
