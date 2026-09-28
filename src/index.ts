@@ -2,6 +2,8 @@
 import "./tool/read"
 import "./tool/grep"
 import "./tool/glob"
+import "./tool/edit"
+import "./tool/bash"
 import { startRepl } from "./cli/repl"
 
 startRepl().catch((e) => {
