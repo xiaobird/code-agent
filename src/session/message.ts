@@ -31,7 +31,27 @@ export function hasPendingToolCalls(msg: MessageWithParts): boolean {
 }
 
 export function filterCompacted(msgs: MessageWithParts[]): MessageWithParts[] {
-  return msgs // Task 21 实现真正的压缩过滤
+  // 找最近一条带 tail_start_id 的 CompactionPart；之前的消息全部丢弃（DB 保留）
+  for (let i = msgs.length - 1; i >= 0; i--) {
+    const cp = msgs[i].parts.find(
+      (p) => p.type === "compaction" && p.tail_start_id,
+    ) as { tail_start_id?: string } | undefined
+    if (!cp?.tail_start_id) continue
+    const idx = msgs.findIndex((m) => m.info.id === cp.tail_start_id)
+    if (idx === -1) return msgs
+    // 上下文 = [compaction 锚点, 总结, ...tail_start_id 起的尾部, ...其后的新消息]
+    // 兼容两种物理布局：tail 在 compaction 之后（插入式）或之前（本实现 compact() 的追加式）
+    const after = msgs.slice(i + 1)
+    const summaryPart: MessageWithParts[] = []
+    for (const m of after) {
+      if (m.info.summary === true) summaryPart.push(m)
+      else break
+    }
+    const rest = after.slice(summaryPart.length)
+    const tail = idx > i ? [] : msgs.slice(idx, i)
+    return [msgs[i], ...summaryPart, ...tail, ...rest]
+  }
+  return msgs
 }
 
 export function toModelMessages(msgs: MessageWithParts[]): ModelMessage[] {

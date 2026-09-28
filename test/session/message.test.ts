@@ -33,3 +33,42 @@ test("pending tool call detection", () => {
   ]}
   expect(hasPendingToolCalls(msg)).toBe(true)
 })
+
+import { filterCompacted } from "../../src/session/message"
+
+function build(id: string, role: "user" | "assistant", parts: unknown[], summary = false): { info: { id: string; sessionID: string; role: string; summary?: boolean }; parts: unknown[] } {
+  return { info: { id, sessionID: "s1", role, ...(summary ? { summary: true } : {}) }, parts }
+}
+
+test("filterCompacted drops head, keeps anchor+summary+tail+new (insert layout)", () => {
+  const msgs = [
+    build("h1", "user", [{ type: "text", text: "old1" }]),
+    build("h2", "assistant", [{ type: "text", text: "old2" }]),
+    build("h3", "user", [{ type: "text", text: "old3" }]),
+    build("cu", "user", [{ type: "compaction", auto: true, tail_start_id: "t1" }]),
+    build("sum", "assistant", [{ type: "text", text: "summary" }], true),
+    build("t1", "user", [{ type: "text", text: "tail1" }]),
+    build("t2", "assistant", [{ type: "text", text: "tail2" }]),
+    build("n1", "user", [{ type: "text", text: "new1" }]),
+  ] as never
+  const out = filterCompacted(msgs)
+  expect(out.map((m: { info: { id: string } }) => m.info.id)).toEqual(["cu", "sum", "t1", "t2", "n1"])
+})
+
+test("filterCompacted with append layout (tail physically before compaction)", () => {
+  const msgs = [
+    build("h1", "user", [{ type: "text", text: "old1" }]),
+    build("t1", "user", [{ type: "text", text: "tail1" }]),
+    build("t2", "assistant", [{ type: "text", text: "tail2" }]),
+    build("cu", "user", [{ type: "compaction", auto: true, tail_start_id: "t1" }]),
+    build("sum", "assistant", [{ type: "text", text: "summary" }], true),
+    build("n1", "user", [{ type: "text", text: "new1" }]),
+  ] as never
+  const out = filterCompacted(msgs)
+  expect(out.map((m: { info: { id: string } }) => m.info.id)).toEqual(["cu", "sum", "t1", "t2", "n1"])
+})
+
+test("filterCompacted identity when no compaction part", () => {
+  const msgs = [build("u1", "user", [{ type: "text", text: "hi" }])] as never
+  expect(filterCompacted(msgs)).toHaveLength(1)
+})
