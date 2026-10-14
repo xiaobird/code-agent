@@ -6,8 +6,8 @@ const YELLOW = "\x1b[33m"
 const RED = "\x1b[31m"
 const RESET = "\x1b[0m"
 
-export function printBanner() {
-  console.log(`${BOLD}code-agent${RESET} ${DIM}(claude-sonnet via anthropic)${RESET}`)
+export function printBanner(modelLabel: string) {
+  console.log(`${BOLD}code-agent${RESET} ${DIM}(${modelLabel})${RESET}`)
   console.log(`${DIM}commands: /exit /revert /compact${RESET}`)
 }
 
