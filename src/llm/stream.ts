@@ -63,7 +63,10 @@ export async function* streamLLM(input: {
             input: u.inputTokens ?? 0,
             output: u.outputTokens ?? 0,
             total: u.totalTokens ?? 0,
-            cache: { read: 0, write: 0 },
+            cache: {
+              read: u.inputTokenDetails?.cacheReadTokens ?? 0,
+              write: u.inputTokenDetails?.cacheWriteTokens ?? 0,
+            },
           },
         }
         break

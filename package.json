@@ -14,9 +14,9 @@
   "license": "ISC",
   "type": "module",
   "dependencies": {
-    "@ai-sdk/anthropic": "^4.0.65",
+    "@ai-sdk/anthropic": "^4.0.79",
     "@ai-sdk/openai-compatible": "^3.0.68",
-    "ai": "^6.0.293",
+    "ai": "^7.0.140",
     "better-sqlite3": "^13.0.3",
     "diff": "^9.0.0",
     "fast-glob": "^3.3.3"

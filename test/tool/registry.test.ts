@@ -8,6 +8,6 @@ test("wraps tool for AI SDK and normalizes errors", async () => {
   })
   const tools = toAISDKTools({ sessionID: "s", abort: new AbortController().signal,
     ask: async () => {}, metadata: async () => {} })
-  const result = await tools.boom.execute!({}, { toolCallId: "t1", messages: [] })
+  const result = await tools.boom.execute!({}, { toolCallId: "t1", messages: [], context: undefined as never })
   expect(result.output).toContain("kaboom")
 })
