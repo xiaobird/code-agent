@@ -44,6 +44,24 @@ export async function startRepl(): Promise<void> {
   printBanner(resolved.label)
   const rl = createInterface({ input: process.stdin, output: process.stdout, prompt: "" })
 
+  // 常驻行队列：readline 只在有监听器时派发 'line' 事件，
+  // 管道输入下"无监听器期间到达的行"会被丢弃，必须自己排队
+  const lineQueue: string[] = []
+  let lineWaiter: (() => void) | undefined
+  rl.on("line", (l) => {
+    lineQueue.push(l)
+    lineWaiter?.()
+    lineWaiter = undefined
+  })
+  const nextLine = (): Promise<string> =>
+    new Promise((resolve) => {
+      if (lineQueue.length) {
+        resolve(lineQueue.shift()!)
+        return
+      }
+      lineWaiter = () => resolve(lineQueue.shift()!)
+    })
+
   rl.on("SIGINT", () => {
     abort.abort()
     printNotice("\naborted")
@@ -56,19 +74,20 @@ export async function startRepl(): Promise<void> {
     { permission: "grep", pattern: "*", action: "allow" },
     { permission: "glob", pattern: "*", action: "allow" },
   ]
-  const rlQuestion = (q: string) =>
-    new Promise<string>((resolve) => rl.question(q, (answer) => resolve(answer.trim().toLowerCase())))
+  const rlQuestion = async (q: string) => {
+    process.stdout.write(q)
+    return (await nextLine()).trim().toLowerCase()
+  }
   const rawAsk = createAsk(defaultRules, rlQuestion)
   const ask = async (req: { permission: string; patterns: string[]; metadata?: Record<string, unknown> }) => {
     if (req.metadata?.diff) printDiff(String(req.metadata.diff))
     await rawAsk(req)
   }
 
-  const question = () =>
-    new Promise<string>((resolve) => {
-      printPrompt()
-      rl.once("line", (line) => resolve(line.trim()))
-    })
+  const question = async () => {
+    printPrompt()
+    return (await nextLine()).trim()
+  }
 
   while (true) {
     const line = await question()
