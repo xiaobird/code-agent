@@ -57,7 +57,7 @@ code-agent --model moonshot/k3    # or pin a model explicitly
 
 Providers: `anthropic` (env `ANTHROPIC_API_KEY`) and `moonshot`/Kimi (env `MOONSHOT_API_KEY`; `sk-kimi-` keys auto-route to the Kimi Code endpoint, classic keys to api.moonshot.cn). Development without linking: `npm run dev` (workspace = this repo).
 
-Tools are read/grep/glob by default; edit/bash prompt for confirmation (y/n/a — "a" remembers for the session). Slash commands: `/exit`, `/revert`, `/compact`.
+Tools are read/grep/glob by default; edit/bash prompt for confirmation — answers accept y/n/a, words (`allow`, `总是允许`), numbers (1/2/3), or plain Enter (= yes); "always" remembers for the session. Reasoning models stream their chain of thought in dim italic. Slash commands: `/exit`, `/revert`, `/compact`.
 
 ## Testing
 

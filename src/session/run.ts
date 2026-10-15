@@ -16,6 +16,7 @@ export interface RunInput {
   system: string[]
   ask: ProcessInput["ask"]
   onText: (d: string) => void
+  onReasoning?: ProcessInput["onReasoning"]
   onToolStart?: ProcessInput["onToolStart"]
   onToolEnd?: ProcessInput["onToolEnd"]
   worktree?: string // 启用影子快照时的 worktree 路径

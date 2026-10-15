@@ -16,6 +16,15 @@ export function text(text: string) {
   ]
 }
 
+export function reasoning(text: string) {
+  const id = "r" + Math.random().toString(36).slice(2, 8)
+  return [
+    { type: "reasoning-start" as const, id },
+    { type: "reasoning-delta" as const, id, delta: text },
+    { type: "reasoning-end" as const, id },
+  ]
+}
+
 export function toolCall(toolCallId: string, toolName: string, input: unknown) {
   return { type: "tool-call" as const, toolCallId, toolName, input: JSON.stringify(input), dynamic: false }
 }

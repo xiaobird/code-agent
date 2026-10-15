@@ -18,6 +18,7 @@ export interface ProcessInput {
   messages: MessageWithParts[]
   ask: (req: { permission: string; patterns: string[]; metadata?: Record<string, unknown> }) => Promise<void>
   onText: (delta: string) => void // CLI 流式渲染回调
+  onReasoning?: (delta: string) => void // 思维链流式渲染（推理模型）
   onToolStart?: (name: string, input: unknown) => void
   onToolEnd?: (name: string, title: string, ms: number) => void
   abort: AbortSignal
@@ -27,7 +28,13 @@ export async function processTurn(input: ProcessInput): Promise<"stop" | "contin
   const { storage, sessionID, assistantMsg } = input
   let text = ""
   const toolStart = new Map<string, number>()
-  const tools = toAISDKTools({ sessionID, abort: input.abort, ask: input.ask, metadata: async () => {} })
+  const ctx: import("../tool/tool").ToolContext = {
+    sessionID,
+    abort: input.abort,
+    ask: input.ask,
+    metadata: async () => {},
+  }
+  const tools = toAISDKTools(ctx)
   const modelMessages = toModelMessages(input.messages)
 
   for await (const event of streamLLM({
@@ -41,6 +48,9 @@ export async function processTurn(input: ProcessInput): Promise<"stop" | "contin
       case "text-delta":
         text += event.text
         input.onText(event.text)
+        break
+      case "reasoning-delta":
+        input.onReasoning?.(event.text)
         break
       case "tool-call": {
         // doom loop 检测：连续第三次完全相同的调用 → 询问，拒绝则终止本轮
@@ -78,7 +88,9 @@ export async function processTurn(input: ProcessInput): Promise<"stop" | "contin
         const part = msgs.flatMap((m) => m.parts).find((p) => p.type === "tool" && p.callID === event.id)
         if (part?.type === "tool") {
           const output = event.output as { output?: string; title?: string; metadata?: Record<string, unknown> }
-          const ms = Date.now() - (toolStart.get(event.id) ?? Date.now())
+          // 耗时从权限确认后起算，剔除等人回答的时间
+          const startedAt = Math.max(toolStart.get(event.id) ?? Date.now(), ctx.lastAskDone ?? 0)
+          const ms = Date.now() - startedAt
           input.onToolEnd?.(part.tool, output?.title ?? part.tool, ms)
           toolStart.delete(event.id)
           storage.updatePart({

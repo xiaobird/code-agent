@@ -7,7 +7,7 @@ import { Storage } from "../storage/db"
 import { runLoop } from "../session/run"
 import { createAsk, type Rule } from "../permission"
 import { resolveModel } from "../llm/provider"
-import { printBanner, printPrompt, printAssistantHeader, printToolStart, printToolEnd, printError, printNotice, printDiff } from "./render"
+import { printBanner, printPrompt, printAssistantHeader, printToolStart, printToolEnd, printError, printNotice, printDiff, printReasoning, printText } from "./render"
 
 const DATA_DIR = path.join(homedir(), ".local", "share", "code-agent")
 
@@ -76,7 +76,10 @@ export async function startRepl(): Promise<void> {
   ]
   const rlQuestion = async (q: string) => {
     process.stdout.write(q)
-    return (await nextLine()).trim().toLowerCase()
+    const answer = await nextLine()
+    // 交互终端用户敲回车自带换行；管道输入没有回显，补一个换行保持格式
+    if (!process.stdin.isTTY) process.stdout.write("\n")
+    return answer.trim().toLowerCase()
   }
   const rawAsk = createAsk(defaultRules, rlQuestion)
   const ask = async (req: { permission: string; patterns: string[]; metadata?: Record<string, unknown> }) => {
@@ -133,6 +136,8 @@ export async function startRepl(): Promise<void> {
     })
 
     printAssistantHeader()
+    // 思维链与正文之间的分隔：切换输出类型时换行
+    let streamKind: "reasoning" | "text" | null = null
     try {
       await runLoop({
         storage,
@@ -142,7 +147,18 @@ export async function startRepl(): Promise<void> {
         system,
         worktree: process.cwd(),
         ask,
-        onText: (d) => process.stdout.write(d),
+        onReasoning: (d) => {
+          if (streamKind !== "reasoning") {
+            if (streamKind === "text") process.stdout.write("\n")
+            streamKind = "reasoning"
+          }
+          printReasoning(d)
+        },
+        onText: (d) => {
+          if (streamKind === "reasoning") process.stdout.write("\n")
+          streamKind = "text"
+          printText(d)
+        },
         onToolStart: printToolStart,
         onToolEnd: printToolEnd,
         abort: abort.signal,

@@ -9,5 +9,7 @@ export interface ToolContext {
   abort: AbortSignal
   ask(req: { permission: string; patterns: string[]; metadata?: Record<string, unknown> }): Promise<void>
   metadata(patch: { title?: string; metadata?: Record<string, unknown> }): Promise<void>
+  /** @internal 最近一次权限确认完成的时间戳；用于把"等人确认"从工具耗时里剔除 */
+  lastAskDone?: number
 }
 export interface ToolResult { title: string; output: string; metadata?: Record<string, unknown> }

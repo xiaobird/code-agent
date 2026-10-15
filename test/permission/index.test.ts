@@ -53,3 +53,19 @@ test("answer 'a' persists an allow rule for the session", async () => {
   await ask({ permission: "read", patterns: ["/tmp/x"] })
   expect(count).toBe(1) // 第二次不再询问
 })
+
+test("rich answer vocabulary accepted", async () => {
+  let answer = "allow"
+  const ask = createAsk([], async () => answer)
+  await ask({ permission: "bash", patterns: ["npm test"] }) // "allow" → yes
+  answer = "总是允许"
+  await ask({ permission: "bash", patterns: ["npm build"] }) // → always，并记住
+  await ask({ permission: "bash", patterns: ["npm build"] }) // 不再询问
+  answer = "3"
+  await expect(ask({ permission: "bash", patterns: ["rm -rf /"] })).rejects.toThrow(PermissionDeniedError)
+})
+
+test("empty answer defaults to yes", async () => {
+  const ask = createAsk([], async () => "")
+  await ask({ permission: "bash", patterns: ["npm test"] })
+})

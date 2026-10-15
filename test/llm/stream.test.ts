@@ -1,5 +1,5 @@
 import { expect, test } from "vitest"
-import { scriptedModel, text, toolCall, finish } from "../helpers/model"
+import { scriptedModel, text, reasoning, toolCall, finish } from "../helpers/model"
 import { streamLLM } from "../../src/llm/stream"
 
 const messages = [{ role: "user" as const, content: "hi" }]
@@ -31,4 +31,13 @@ test("maps errors", async () => {
   for await (const e of streamLLM({ model, system: [], messages, tools: {}, abort: new AbortController().signal }))
     events.push(e)
   expect(events[0]).toMatchObject({ type: "error", error: { message: "provider down" } })
+})
+
+test("maps reasoning deltas", async () => {
+  const model = scriptedModel([[...reasoning("let me think"), ...text("answer"), finish("stop", 1, 1)]])
+  const events = []
+  for await (const e of streamLLM({ model, system: [], messages, tools: {}, abort: new AbortController().signal }))
+    events.push(e)
+  expect(events[0]).toMatchObject({ type: "reasoning-delta", text: "let me think" })
+  expect(events[1]).toMatchObject({ type: "text-delta", text: "answer" })
 })

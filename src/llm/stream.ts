@@ -8,6 +8,7 @@ export type TokenUsage = {
 }
 export type LLMEvent =
   | { type: "text-delta"; text: string }
+  | { type: "reasoning-delta"; text: string }
   | { type: "tool-call"; id: string; name: string; input: unknown }
   | { type: "tool-result"; id: string; output: unknown }
   | { type: "finish"; reason: string; tokens: TokenUsage }
@@ -32,6 +33,9 @@ export async function* streamLLM(input: {
     switch (part.type) {
       case "text-delta":
         yield { type: "text-delta", text: part.text }
+        break
+      case "reasoning-delta":
+        yield { type: "reasoning-delta", text: part.text }
         break
       case "tool-call":
         yield { type: "tool-call", id: part.toolCallId, name: part.toolName, input: part.input }

@@ -1,4 +1,5 @@
 const DIM = "\x1b[2m"
+const DIM_ITALIC = "\x1b[2m\x1b[3m"
 const BOLD = "\x1b[1m"
 const CYAN = "\x1b[36m"
 const GREEN = "\x1b[32m"
@@ -12,31 +13,68 @@ export function printBanner(modelLabel: string) {
 }
 
 export function printPrompt() {
+  breakLine()
   process.stdout.write(`${CYAN}❯${RESET} `)
 }
 
 export function printAssistantHeader() {
-  process.stdout.write(`\n${BOLD}assistant${RESET}\n`)
+  process.stdout.write(`\n`)
 }
 
-export function printToolStart(name: string, input: unknown) {
+// 流式文本与工具行/提示之间的换行跟踪
+let cursorMidLine = false
+function breakLine() {
+  if (cursorMidLine) {
+    process.stdout.write("\n")
+    cursorMidLine = false
+  }
+}
+
+export function printText(delta: string) {
+  cursorMidLine = !delta.endsWith("\n")
+  process.stdout.write(delta)
+}
+
+/** 思维链（推理模型）：暗色斜体，Claude Code thinking 风格 */
+export function printReasoning(delta: string) {
+  cursorMidLine = !delta.endsWith("\n")
+  process.stdout.write(DIM_ITALIC + delta + RESET)
+}
+
+/** 工具参数的一句话摘要 */
+function describeArgs(name: string, input: unknown): string {
+  const i = (input ?? {}) as Record<string, unknown>
+  const first = (k: string): string | undefined => {
+    const v = i[k]
+    return typeof v === "string" && v ? v : undefined
+  }
   const brief =
-    input && typeof input === "object" && "filePath" in (input as Record<string, unknown>)
-      ? ` ${(input as Record<string, unknown>).filePath}`
-      : input && typeof input === "object" && "command" in (input as Record<string, unknown>)
-        ? ` ${(input as Record<string, unknown>).command}`
-        : input && typeof input === "object" && "pattern" in (input as Record<string, unknown>)
-          ? ` ${(input as Record<string, unknown>).pattern}`
-          : ""
-  process.stdout.write(`${DIM}▸ ${name}${brief}${RESET}\n`)
+    first("command") ?? first("filePath") ?? first("pattern") ?? first("description") ?? first("prompt") ?? ""
+  return brief.replace(/\s+/g, " ").trim()
 }
 
+function trunc(s: string, max = 64): string {
+  return s.length > max ? s.slice(0, max) + "…" : s
+}
+
+/** 工具开始：⏺ Bash(npm test) 一行紧凑展示 */
+export function printToolStart(name: string, input: unknown) {
+  breakLine()
+  const label = name.charAt(0).toUpperCase() + name.slice(1)
+  const args = describeArgs(name, input)
+  process.stdout.write(
+    `${CYAN}⏺${RESET} ${BOLD}${label}${RESET}${args ? `(${DIM}${trunc(args)}${RESET})` : ""}\n`,
+  )
+}
+
+/** 工具结束：快的不打印（开始行已足够），慢的报耗时 */
 export function printToolEnd(name: string, _title: string, ms: number) {
-  process.stdout.write(`${GREEN}✓ ${name}${RESET} ${DIM}(${(ms / 1000).toFixed(1)}s)${RESET}\n`)
+  if (ms < 3000) return
+  process.stdout.write(`${DIM}  ⏺ ${name} completed in ${(ms / 1000).toFixed(1)}s${RESET}\n`)
 }
 
 export function printError(message: string) {
-  process.stdout.write(`${RED}error: ${message}${RESET}\n`)
+  process.stdout.write(`${RED}⏺ ${message}${RESET}\n`)
 }
 
 export function printDiff(diff: string) {
