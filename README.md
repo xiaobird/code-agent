@@ -43,9 +43,19 @@ Key decisions:
 
 ```bash
 npm install
-ANTHROPIC_API_KEY=sk-... npm run dev   # CLI REPL
-npm test                                # 85 tests, zero network
+npm link            # registers the global `code-agent` command
+npm test            # 85 tests, zero network
 ```
+
+Run it inside any project (that project becomes the agent's workspace — its cwd, snapshot worktree, and permission scope):
+
+```bash
+cd /path/to/your-project
+code-agent                        # picks a provider by available env key
+code-agent --model moonshot/k3    # or pin a model explicitly
+```
+
+Providers: `anthropic` (env `ANTHROPIC_API_KEY`) and `moonshot`/Kimi (env `MOONSHOT_API_KEY`; `sk-kimi-` keys auto-route to the Kimi Code endpoint, classic keys to api.moonshot.cn). Development without linking: `npm run dev` (workspace = this repo).
 
 Tools are read/grep/glob by default; edit/bash prompt for confirmation (y/n/a — "a" remembers for the session). Slash commands: `/exit`, `/revert`, `/compact`.
 

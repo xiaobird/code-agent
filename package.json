@@ -28,5 +28,8 @@
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",
     "vitest": "^5.0.2"
+  },
+  "bin": {
+    "code-agent": "bin/code-agent.js"
   }
 }
