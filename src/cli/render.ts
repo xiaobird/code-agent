@@ -8,8 +8,34 @@ const RED = "\x1b[31m"
 const RESET = "\x1b[0m"
 
 export function printBanner(modelLabel: string) {
-  console.log(`${BOLD}code-agent${RESET} ${DIM}(${modelLabel})${RESET}`)
-  console.log(`${DIM}commands: /exit /revert /compact${RESET}`)
+  const rows = [
+    `${YELLOW}${BOLD}⚡ code-agent${RESET}`,
+    `${DIM}${modelLabel}${RESET}`,
+    `${DIM}shift+tab 切换权限模式 · /mode 选择 · /exit 退出 · /revert 回滚${RESET}`,
+  ]
+  const plain = rows.map((r) => r.replace(/\x1b\[[0-9;]*m/g, ""))
+  const width = Math.max(...plain.map((r) => r.length)) + 2
+  const top = `${DIM}╭${"─".repeat(width)}╮${RESET}`
+  const bottom = `${DIM}╰${"─".repeat(width)}╯${RESET}`
+  console.log(`\n${top}`)
+  for (let i = 0; i < rows.length; i++)
+    console.log(`${DIM}│${RESET} ${rows[i].padEnd(width - 1)}${DIM}│${RESET}`)
+  console.log(bottom)
+}
+
+/** 权限模式菜单（/mode 触发），✓ 标当前项 */
+export function printModeMenu(modes: { icon: string; label: string; description: string }[], currentIndex: number) {
+  console.log(`\n${BOLD}权限模式${RESET}`)
+  modes.forEach((m, i) => {
+    const mark = i === currentIndex ? `${GREEN}✓${RESET}` : " "
+    console.log(` ${mark} ${i + 1}. ${m.icon} ${BOLD}${m.label}${RESET} ${DIM}${m.description}${RESET}`)
+  })
+  process.stdout.write(`${DIM}输入编号选择（回车取消）:${RESET} `)
+}
+
+/** 模式切换通知 */
+export function printModeNotice(icon: string, label: string, description: string) {
+  process.stdout.write(`${YELLOW}${icon} ${label}${RESET} ${DIM}— ${description}${RESET}\n`)
 }
 
 export function printPrompt() {

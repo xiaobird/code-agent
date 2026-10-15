@@ -6,10 +6,17 @@ import { mkdirSync } from "fs"
 import { Storage } from "../storage/db"
 import { runLoop } from "../session/run"
 import { createAsk, type Rule } from "../permission"
+import { MODES, modeInfo, modeRules, nextMode, type PermissionMode } from "../permission/modes"
 import { resolveModel } from "../llm/provider"
-import { printBanner, printPrompt, printAssistantHeader, printToolStart, printToolEnd, printError, printNotice, printDiff, printReasoning, printText } from "./render"
+import {
+  printBanner, printPrompt, printAssistantHeader, printToolStart, printToolEnd,
+  printError, printNotice, printDiff, printReasoning, printText, printModeMenu, printModeNotice,
+} from "./render"
 
 const DATA_DIR = path.join(homedir(), ".local", "share", "code-agent")
+
+const PLAN_HINT =
+  "You are currently in PLAN MODE: file edits and command execution are disabled. Explore the code, gather facts, and present a concrete plan instead of making changes."
 
 export async function startRepl(): Promise<void> {
   const modelArg = process.argv.includes("--model")
@@ -31,18 +38,37 @@ export async function startRepl(): Promise<void> {
   const session = storage.createSession({ directory: process.cwd() })
   const abort = new AbortController()
 
-  const system = [
+  const baseSystem = [
     "You are a coding agent working in a terminal.",
     `Working directory: ${process.cwd()}`,
     `Platform: ${process.platform}`,
     "Use the available tools to read, search and understand code before answering.",
   ]
 
+  // 权限模式：shift+tab 循环 / /mode 菜单选择；规则数组原地更新即时生效
+  // 用对象持有，避免 TS 控制流把闭包里的重新赋值收窄掉
+  const state: { mode: PermissionMode } = { mode: "confirm" }
+  const rules: Rule[] = modeRules(state.mode)
+  const applyMode = (next: PermissionMode, announce = true) => {
+    state.mode = next
+    rules.length = 0
+    rules.push(...modeRules(state.mode))
+    if (announce) {
+      const info = modeInfo(state.mode)
+      printModeNotice(info.icon, info.label, info.description)
+    }
+  }
+
   const { registerTaskTool } = await import("../tool/task")
-  registerTaskTool({ storage, model: resolved.model, modelInfo: { contextLimit: resolved.contextLimit }, baseSystem: system })
+  registerTaskTool({ storage, model: resolved.model, modelInfo: { contextLimit: resolved.contextLimit }, baseSystem })
 
   printBanner(resolved.label)
-  const rl = createInterface({ input: process.stdin, output: process.stdout, prompt: "" })
+  const rl = createInterface({
+    input: process.stdin,
+    output: process.stdout,
+    prompt: "",
+    terminal: Boolean(process.stdin.isTTY),
+  })
 
   // 常驻行队列：readline 只在有监听器时派发 'line' 事件，
   // 管道输入下"无监听器期间到达的行"会被丢弃，必须自己排队
@@ -62,18 +88,19 @@ export async function startRepl(): Promise<void> {
       lineWaiter = () => resolve(lineQueue.shift()!)
     })
 
+  // shift+tab 循环切换权限模式（对齐 Claude Code）
+  if (process.stdin.isTTY) {
+    process.stdin.on("keypress", (_s: string, key: { name?: string; shift?: boolean }) => {
+      if (key?.name === "tab" && key.shift) applyMode(nextMode(state.mode))
+    })
+  }
+
   rl.on("SIGINT", () => {
     abort.abort()
     printNotice("\naborted")
     printPrompt()
   })
 
-  // 默认权限：只读工具放行，写操作与命令执行需确认
-  const defaultRules: Rule[] = [
-    { permission: "read", pattern: "*", action: "allow" },
-    { permission: "grep", pattern: "*", action: "allow" },
-    { permission: "glob", pattern: "*", action: "allow" },
-  ]
   const rlQuestion = async (q: string) => {
     process.stdout.write(q)
     const answer = await nextLine()
@@ -81,7 +108,7 @@ export async function startRepl(): Promise<void> {
     if (!process.stdin.isTTY) process.stdout.write("\n")
     return answer.trim().toLowerCase()
   }
-  const rawAsk = createAsk(defaultRules, rlQuestion)
+  const rawAsk = createAsk(rules, rlQuestion)
   const ask = async (req: { permission: string; patterns: string[]; metadata?: Record<string, unknown> }) => {
     if (req.metadata?.diff) printDiff(String(req.metadata.diff))
     await rawAsk(req)
@@ -96,6 +123,14 @@ export async function startRepl(): Promise<void> {
     const line = await question()
     if (!line) continue
     if (line === "/exit") break
+    if (line === "/mode") {
+      printModeMenu(MODES, MODES.findIndex((m) => m.mode === state.mode))
+      const pick = (await nextLine()).trim()
+      const n = Number(pick)
+      if (n >= 1 && n <= MODES.length) applyMode(MODES[n - 1].mode)
+      else if (pick) printNotice("已取消")
+      continue
+    }
     if (line === "/revert") {
       const msgs = storage.messagesWithParts(session.id)
       let target: { fromHash?: string; hash: string } | undefined
@@ -138,6 +173,7 @@ export async function startRepl(): Promise<void> {
     printAssistantHeader()
     // 思维链与正文之间的分隔：切换输出类型时换行
     let streamKind: "reasoning" | "text" | null = null
+    const system = state.mode === "plan" ? [...baseSystem, PLAN_HINT] : baseSystem
     try {
       await runLoop({
         storage,

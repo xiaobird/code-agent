@@ -28,8 +28,12 @@ function brief(pattern: string, max = 72): string {
   return one.length > max ? one.slice(0, max) + "…" : one
 }
 
+/**
+ * 注意：直接复用传入的 rules 数组（不拷贝），调用方可通过原地修改数组
+ * 动态切换权限模式；"always" 回答也会写入该数组。
+ */
 export function createAsk(rules: Rule[], prompt: (question: string) => Promise<string>) {
-  const sessionRules = [...rules]
+  const sessionRules = rules
   return async function ask(req: {
     permission: string
     patterns: string[]
